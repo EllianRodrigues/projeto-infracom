@@ -1,5 +1,6 @@
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
+import rsa 
 
 def receive_messages(socket):
     while True:
@@ -10,8 +11,15 @@ def send_message(socket, address):
     while True:
         target_pc = input("Insira o número do PC (2 or 6): ")
         if target_pc == '2':
+        
             message = input("Insira a mensagem para PC2: ")
-            socket.sendto(message.encode(), pc2_address)
+            message_bytes = message.encode('utf-8')
+            
+            ciphertext = rsa.encrypt(message_bytes, public_key_PC2)
+            socket.sendto(ciphertext, pc2_address)  
+            
+            print(f'mensagem criptografada enviada: {ciphertext}')   
+                  
         elif target_pc == '6':
             message = input("Insira a mensagem para PC6: ")
             socket.sendto(message.encode(), pc6_address)
@@ -25,6 +33,18 @@ socket_pc1.bind(('localhost', 10112))
 # Endereços dos PCs permitidos
 pc2_address = ('localhost', 10113)
 pc6_address = ('localhost', 10117)
+
+#conexão com o AC
+ac_address = ('localhost', 3500)
+socket_pc1.sendto("request_public_key_PC1".encode(), ac_address)
+private_key_bytes, _ = socket_pc1.recvfrom(1024)
+private_key = rsa.PrivateKey.load_pkcs1(private_key_bytes)
+print(f"Chave privada recebida do AC: {private_key}")
+
+socket_pc1.sendto("Qual_a_chave_publica_PC2".encode(), ac_address)
+public_key_bytes_PC2, _ = socket_pc1.recvfrom(1024)
+public_key_PC2 = rsa.PublicKey.load_pkcs1(public_key_bytes_PC2)
+print(f"Chave publica recebida do AC: {public_key_PC2}")
 
 # Threads para receber e enviar mensagens
 Thread(target=receive_messages, args=(socket_pc1,)).start()
