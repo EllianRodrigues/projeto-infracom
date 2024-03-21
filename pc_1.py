@@ -1,33 +1,49 @@
-from socket import socket, AF_INET, SOCK_DGRAM
+from socket import socket, AF_INET, SOCK_DGRAM, gethostbyname
 from threading import Thread
 import rsa 
 
+from cryptography.fernet import Fernet
 
+localhost_ip = gethostbyname('localhost')
+
+ip_PC2_Para_Key = (localhost_ip, 22222)
 def receive_messages(socket):
     while True:   
         ciphertext, address = socket.recvfrom(2048)
-        print(f"\nMensagem criptografada recebida de {address} mensagem criptografada: {ciphertext}")
-        plaintext = rsa.decrypt(ciphertext, private_key)
-        print(f'\nDescriptografado: {plaintext.decode("utf-8")}')
+        if address == ip_PC2_Para_Key:
+            print("cipher_key: ", ciphertext.hex())
+            key_PC2 = rsa.decrypt(ciphertext, private_key)
+            print("key: ", key_PC2)
+            cipher_suite_PC2 = Fernet(key_PC2)
+        else:
+            print(f"\nMensagem criptografada recebida de {address} mensagem criptografada: {ciphertext}")           
+            plaintext = cipher_suite_PC2.decrypt(ciphertext).decode()
+            print(f'\nDescriptografado: {plaintext}')
 
 def send_message(socket, address, ac_socket):
    
     while True:
         target_pc = input("Insira o número do PC (2 or 6): ")
         if target_pc == '2':
-                                  
+                                                                 
             ac_socket.sendto("Qual_a_chave_publica_PC2".encode(), ac_address)
             public_key_bytes_PC2, _ = ac_socket.recvfrom(1024)
             public_key_PC2 = rsa.PublicKey.load_pkcs1(public_key_bytes_PC2)
-            print(f"Chave publica recebida do AC: {public_key_PC2}")         
+            print(f"Chave publica recebida do AC: {public_key_PC2}")  
+            
+            key = Fernet.generate_key()
+            print("key: ", key)
+            cipher_key = rsa.encrypt(key, public_key_PC2)
+            print("cypher Key: ", cipher_key)
+            ac_socket.sendto(cipher_key, pc2_address)
+            
+            cipher_suite = Fernet(key)
                            
             message = input("Insira a mensagem para PC2: ")
-            message_bytes = message.encode('utf-8')
+            message_bytes = cipher_suite.encrypt(message.encode())           
+            socket.sendto(message_bytes, pc2_address)  
             
-            ciphertext = rsa.encrypt(message_bytes, public_key_PC2)
-            socket.sendto(ciphertext, pc2_address)  
-            
-            print(f'mensagem criptografada enviada: {ciphertext}')   
+            print(f'mensagem criptografada enviada: {message_bytes}')   
                   
         elif target_pc == '6':
             message = input("Insira a mensagem para PC6: ")

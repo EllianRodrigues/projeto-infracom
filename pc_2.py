@@ -1,13 +1,25 @@
-from socket import socket, AF_INET, SOCK_DGRAM
+from socket import socket, AF_INET, SOCK_DGRAM, gethostbyname
 from threading import Thread
 import rsa
+
+from cryptography.fernet import Fernet
+
+localhost_ip = gethostbyname('localhost')
+
+ip_PC1_Para_Key = (localhost_ip, 11111)
 
 def receive_messages(socket):
     while True:
         ciphertext, address = socket.recvfrom(2048)
-        print(f"\nMensagem criptografada recebida de {address} mensagem criptografada: {ciphertext}")
-        plaintext = rsa.decrypt(ciphertext, private_key)
-        print(f'\nDescriptografado: {plaintext.decode("utf-8")}')
+        if address == ip_PC1_Para_Key:
+            print("cipher_key: ", ciphertext.hex())
+            key_PC1 = rsa.decrypt(ciphertext, private_key)
+            print("key: ", key_PC1)
+            cipher_suite_PC1 = Fernet(key_PC1)
+        else:
+            print(f"\nMensagem criptografada recebida de {address} mensagem criptografada: {ciphertext}")           
+            plaintext = cipher_suite_PC1.decrypt(ciphertext).decode()
+            print(f'\nDescriptografado: {plaintext}')
         
 def send_message(socket, address, ac_socket):
     while True:
@@ -19,17 +31,20 @@ def send_message(socket, address, ac_socket):
             public_key_PC1 = rsa.PublicKey.load_pkcs1(public_key_bytes_PC1)
             print(f"Chave publica recebida do AC: {public_key_PC1}") 
             
-            
+            key = Fernet.generate_key()
+            print("key: ", key)
+            cipher_key = rsa.encrypt(key, public_key_PC1)
+            print("cypher Key: ", cipher_key)
+            ac_socket.sendto(cipher_key, pc1_address)
+                     
+            cipher_suite = Fernet(key)
+                           
             message = input("Insira a mensagem para PC2: ")
-            message_bytes = message.encode('utf-8')
-            
-            ciphertext = rsa.encrypt(message_bytes, public_key_PC1)
-            socket.sendto(ciphertext, pc1_address)  
-            
-            print(f'mensagem criptografada enviada: {ciphertext}')  
-            
-            
-            
+            message_bytes = cipher_suite.encrypt(message.encode())           
+            socket.sendto(message_bytes, pc1_address)  
+           
+            print(f'mensagem criptografada enviada: {message_bytes}')  
+        
         elif target_pc == '3':
             message = input("Insira a mensagem para PC3: ")
             socket.sendto(message.encode(), pc3_address)
