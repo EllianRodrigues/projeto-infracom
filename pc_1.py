@@ -33,7 +33,6 @@ def receive_messages(socket, address_clockwise, address_anticlockwise):
                 ac_socket.sendto(f"Qual_a_chave_publica_PC{str(decode_message['source_address'])}".encode(), ac_address)
                 public_key_bytes_PC, _ = ac_socket.recvfrom(1024)
                 public_key_PC = rsa.PublicKey.load_pkcs1(public_key_bytes_PC)
-                print(f"Chave publica recebida do AC: {public_key_PC}")
 
                 # Verificar a assinatura com a chave pública
                 if verify(sem_assinatura.encode(), assinatura, public_key_PC):
@@ -93,7 +92,21 @@ def send(socket, address_clockwise, address_anticlockwise, message):
                     else:
                         socket.sendto(datagram.encode(), address_anticlockwise)
                 else:
-                    datagram = make_pseudo_datagram(message, destination_address[1], False)
+                    ############################################################
+                    ac_socket.sendto(f"Qual_a_chave_publica_PC{str(destination_address[1])}".encode(), ac_address)
+                    public_key_bytes_PC, _ = ac_socket.recvfrom(1024)
+                    public_key_PC = rsa.PublicKey.load_pkcs1(public_key_bytes_PC)
+                    print(f"Chave publica recebida do AC: {public_key_PC}")  
+                    
+                    key = Fernet.generate_key()
+                    cipher_key = rsa.encrypt(key, public_key_PC)
+                    ac_socket.sendto(cipher_key, destination_address)
+                    
+                    cipher_suite = Fernet(key)
+
+                    message_bytes = cipher_suite.encrypt(message.encode())           
+                    ############################################################
+                    datagram = make_pseudo_datagram(message_bytes, destination_address[1], False)
                     # Cria um pacote com o endereço de src, dest e a mensagem
                     # Agora precisamos fazer o roteamento para enviar o pacote
                     if (roteamento(10112, destination_address) == "clockwise"):

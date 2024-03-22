@@ -23,7 +23,8 @@ def receive_messages(socket, address_clockwise, address_anticlockwise):
     while True:
         message, address = socket.recvfrom(2048)
         print(f"\nMensagem recebida pela porta: {address} | ", end="")
-        decode_message = eval(message.decode())
+        if (address[1] != 11111 and address[1] != 22222 and address[1] != 33333 and address[1] != 44444 and address[1] != 55555 and address[1] != 66000):
+            decode_message = eval(message.decode())
         if (decode_message['token']):
             if (decode_message['destination_address'] == 10115):
                 sem_assinatura = eval(decode_message['message'])['mensagem']
@@ -49,23 +50,31 @@ def receive_messages(socket, address_clockwise, address_anticlockwise):
             else:
                 #Encaminhamento (não mexer aqui!)
                 encaminha(socket, address_clockwise, address_anticlockwise, address, message)
-        else: 
-            if (decode_message['destination_address'] == 10115):
-                print("Destinatario valido\nMensagem de: " + str(decode_message['source_address']) + "\nBody: " + decode_message['message'])
-                #Responde as mensagem, exceto a de confirmação
-                if (decode_message['message'] != "Mensagem recebida" and decode_message['message'] != "MENSAGEM VERIFICADA!!! OI, PC10115"):
-                    # Envia resposta de volta
-                    print("Enviando confirmação de recebimento...")
-                    datagram = make_pseudo_datagram("Mensagem recebida", decode_message['source_address'], False)
-                    if (roteamento(10115, ('tantofaz', decode_message['source_address'])) == "clockwise"):
-                        socket.sendto(datagram.encode(), address_clockwise)
-                    else:
-                        socket.sendto(datagram.encode(), address_anticlockwise)
-                #Se a mensagem for para outro PC, eu encaminho no sentido contrario que eu recebi
-                pedir_input()
-            else: 
-                #Encaminhamento (não mexer aqui!)
-                encaminha(socket, address_clockwise, address_anticlockwise, address, message)
+        else:
+            if (address[1] == 11111 or address[1] == 22222 or address[1] == 33333 or address[1] == 44444 or address[1] == 55555 or address[1] == 66000):
+                key_PC = rsa.decrypt(message, private_key)
+                cipher_suite_PC = Fernet(key_PC)
+                print(str(key_PC))
+            else:
+                if (decode_message['destination_address'] == 10115):
+                    print("Destinatario valido\nMensagem de: " + str(decode_message['source_address']) +
+                           "\nBody criptografado: " + str(decode_message['message']) +
+                           "\nBody descriptografo: " + cipher_suite_PC.decrypt(decode_message['message']).decode())
+                    #Responde as mensagem, exceto a de confirmação
+                    if (decode_message['message'] != "Mensagem recebida" and decode_message['message'] != "MENSAGEM VERIFICADA!!! OI, PC10115"):
+                        # Envia resposta de volta
+                        print("Enviando confirmação de recebimento...")
+                        datagram = make_pseudo_datagram("Mensagem recebida", decode_message['source_address'], False)
+                        if (roteamento(10115, ('tantofaz', decode_message['source_address'])) == "clockwise"):
+                            socket.sendto(datagram.encode(), address_clockwise)
+                        else:
+                            socket.sendto(datagram.encode(), address_anticlockwise)
+                    #Se a mensagem for para outro PC, eu encaminho no sentido contrario que eu recebi
+                    pedir_input()
+                else: 
+                    #Encaminhamento (não mexer aqui!)
+                    encaminha(socket, address_clockwise, address_anticlockwise, address, message)
+
 
 def send_message(socket, address_clockwise, address_anticlockwise):
     while True:
@@ -92,10 +101,24 @@ def send(socket, address_clockwise, address_anticlockwise, message):
                     else:
                         socket.sendto(datagram.encode(), address_anticlockwise)
                 else:
-                    datagram = make_pseudo_datagram(message, destination_address[1], False)
+                    ############################################################
+                    ac_socket.sendto(f"Qual_a_chave_publica_PC{str(destination_address[1])}".encode(), ac_address)
+                    public_key_bytes_PC, _ = ac_socket.recvfrom(1024)
+                    public_key_PC = rsa.PublicKey.load_pkcs1(public_key_bytes_PC)
+                    print(f"Chave publica recebida do AC: {public_key_PC}")  
+                    
+                    key = Fernet.generate_key()
+                    cipher_key = rsa.encrypt(key, public_key_PC)
+                    ac_socket.sendto(cipher_key, destination_address)
+                    
+                    cipher_suite = Fernet(key)
+
+                    message_bytes = cipher_suite.encrypt(message.encode())           
+                    ############################################################
+                    datagram = make_pseudo_datagram(message_bytes, destination_address[1], False)
                     # Cria um pacote com o endereço de src, dest e a mensagem
                     # Agora precisamos fazer o roteamento para enviar o pacote
-                    if (roteamento(10112, destination_address) == "clockwise"):
+                    if (roteamento(10115, destination_address) == "clockwise"):
                         socket.sendto(datagram.encode(), address_clockwise)
                     else:
                         socket.sendto(datagram.encode(), address_anticlockwise)
