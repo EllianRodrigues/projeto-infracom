@@ -64,4 +64,4 @@
 - ARIEL RODRIGUES - @cin.ufpe.br
 - ELLIAN RODRIGUES - @cin.ufpe.br
 - FRANCISCO GABRIEL - fglb@cin.ufpe.br
-- MIGUEL OLIVEIRA - @cin.ufpe.br
+- MIGUEL OLIVEIRA - mgo@cin.ufpe.br
